@@ -233,3 +233,53 @@ void ef_print(const char *format, ...) {
     rt_kprintf("%s", log_buf);
     va_end(args);
 }
+
+#if defined(RT_USING_FINSH) && defined(FINSH_USING_MSH)
+#include <finsh.h>
+#if defined(EF_USING_ENV)
+static void setenv(uint8_t argc, char **argv) {
+    uint8_t i;
+
+    if (argc > 3) {
+        /* environment variable value string together */
+        for (i = 0; i < argc - 2; i++) {
+            argv[2 + i][rt_strlen(argv[2 + i])] = ' ';
+        }
+    }
+    if (argc == 1) {
+        rt_kprintf("Please input: setenv <key> [value]\n");
+    } else if (argc == 2) {
+        ef_set_env(argv[1], NULL);
+    } else {
+        ef_set_env(argv[1], argv[2]);
+    }
+}
+MSH_CMD_EXPORT(setenv, Set an envrionment variable.);
+
+static void printenv(uint8_t argc, char **argv) {
+    ef_print_env();
+}
+MSH_CMD_EXPORT(printenv, Print all envrionment variables.);
+
+static void saveenv(uint8_t argc, char **argv) {
+    ef_save_env();
+}
+MSH_CMD_EXPORT(saveenv, Save all envrionment variables to flash.);
+
+static void getvalue(uint8_t argc, char **argv) {
+    char *value = NULL;
+    value = ef_get_env(argv[1]);
+    if (value) {
+        rt_kprintf("The %s value is %s.\n", argv[1], value);
+    } else {
+        rt_kprintf("Can't find %s.\n", argv[1]);
+    }
+}
+MSH_CMD_EXPORT(getvalue, Get an envrionment variable by name.);
+
+static void resetenv(uint8_t argc, char **argv) {
+    ef_env_set_default();
+}
+MSH_CMD_EXPORT(resetenv, Reset all envrionment variable to default.);
+#endif /* defined(EF_USING_ENV) */
+#endif /* defined(RT_USING_FINSH) && defined(FINSH_USING_MSH) */

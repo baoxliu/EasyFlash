@@ -1,7 +1,7 @@
 /*
  * This file is part of the EasyFlash Library.
  *
- * Copyright (c) 2015, Armink, <armink.ztl@gmail.com>
+ * Copyright (c) 2015-2017, Armink, <armink.ztl@gmail.com>
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -88,7 +88,7 @@ uint32_t ef_calc_crc32(uint32_t crc, const void *buf, size_t size)
 {
     const uint8_t *p;
 
-    p = buf;
+    p = (const uint8_t *)buf;
     crc = crc ^ ~0U;
 
     while (size--) {
@@ -96,65 +96,4 @@ uint32_t ef_calc_crc32(uint32_t crc, const void *buf, size_t size)
     }
 
     return crc ^ ~0U;
-}
-
-/**
- * Get this flash sector current status.
- *
- * @param addr sector address
- * @param sec_size sector address
- *
- * @return the flash sector current status
- */
-FlashSecrorStatus ef_get_sector_status(uint32_t addr, size_t sec_size) {
-    uint32_t cur_using_addr = ef_find_sec_using_end_addr(addr, sec_size);
-    /* get current status by current using address */
-    if (cur_using_addr == addr) {
-        return FLASH_SECTOR_EMPTY;
-    } else if (cur_using_addr < addr + sec_size - 4) {
-        return FLASH_SECTOR_USING;
-    } else {
-        return FLASH_SECTOR_FULL;
-    }
-}
-
-/**
- * Find the current flash sector using end address by continuous 0xFF.
- *
- * @param addr sector address
- * @param sec_size sector address
- *
- * @return current flash sector using end address
- */
-uint32_t ef_find_sec_using_end_addr(uint32_t addr, size_t sec_size) {
-    size_t start, continue_ff;
-    /* counts continuous 0xFF */
-    for (start = 0; start < sec_size; start++) {
-        if (*(uint8_t *) (addr + start) == 0xFF) {
-            /* make sure it is not the last byte */
-            if (start < sec_size - 1) {
-                /* start counts */
-                for (continue_ff = 1; continue_ff < sec_size - start; continue_ff++) {
-                    if (*(uint8_t *) (addr + start + continue_ff) != 0xFF) {
-                        start += continue_ff;
-                        break;
-                    }
-                }
-                /* all sector counts finish */
-                if (continue_ff == sec_size - start) {
-                    break;
-                }
-            }
-        }
-    }
-    if ((start == 0) && (continue_ff == sec_size)) {
-        /* from 0 to sec_size all sector is 0xFF, so the sector is empty */
-        return addr;
-    } else if (start < sec_size) {
-        /* form start to sec_size all area is 0xFF, so it's used part of the sector */
-        return addr + start;
-    } else {
-        /* all sector not has continuous 0xFF, alignment by word */
-        return addr + sec_size - 4;
-    }
 }

@@ -24,10 +24,11 @@
 |\easyflash\src\ef_log.c                |Log 相关操作接口及实现源码|
 |\easyflash\src\ef_utils.c              |EasyFlash常用小工具，例如：CRC32|
 |\easyflash\src\easyflash.c             |目前只包含EasyFlash初始化方法|
-|\easyflash\port\ef_port.c              |不同平台下的EasyFlash移植接口及配置参数|
-|\demo\env\stm32f10x\non_os             |stm32f10x裸机的Env demo|
-|\demo\env\stm32f10x\rtt                |stm32f10x基于[RT-Thread](http://www.rt-thread.org/)的Env demo|
-|\demo\env\stm32f4xx                    |stm32f4xx基于[RT-Thread](http://www.rt-thread.org/)的Env demo|
+|\easyflash\port\ef_port.c              |不同平台下的EasyFlash移植接口|
+|\demo\env\stm32f10x\non_os             |stm32f10x裸机片内Flash的Env demo|
+|\demo\env\stm32f10x\non_os_spi_flash   |stm32f10x裸机SPI Flash的Env demo|
+|\demo\env\stm32f10x\rtt                |stm32f10x基于[RT-Thread](http://www.rt-thread.org/)的片内Flash Env demo|
+|\demo\env\stm32f4xx                    |stm32f4xx基于[RT-Thread](http://www.rt-thread.org/)的片内Flash Env demo|
 |\demo\iap\ymodem+rtt.c                 |使用[RT-Thread](http://www.rt-thread.org/)+[Ymodem](https://github.com/RT-Thread/rt-thread/tree/master/components/utilities/ymodem)的IAP Demo|
 |\demo\log\easylogger.c                 |基于[EasyLogger](https://github.com/armink/EasyLogger)的Log Demo|
 
@@ -60,7 +61,7 @@ EfErrCode ef_port_init(ef_env const **default_env, size_t *default_env_size)
 
 ### 4.2 读取Flash
 
-最小单位为4个字节
+最小单位为4个字节。
 
 ```C
 EfErrCode ef_port_read(uint32_t addr, uint32_t *buf, size_t size)
@@ -85,7 +86,7 @@ EfErrCode ef_port_erase(uint32_t addr, size_t size)
 
 ### 4.4 写入Flash
 
-最小单位为4个字节
+最小单位为4个字节。
 
 ```C
 EfErrCode ef_port_write(uint32_t addr, const uint32_t *buf, size_t size)
@@ -99,7 +100,7 @@ EfErrCode ef_port_write(uint32_t addr, const uint32_t *buf, size_t size)
 
 ### 4.5 对环境变量缓冲区加锁
 
-为了保证RAM缓冲区在并发执行的安全性，所以需要对其进行加锁（如果项目的使用场景不存在并发情况，则可以忽略）。有操作系统是可以使用获取信号量来加锁，裸机时可以通过关闭全局中断来加锁
+为了保证RAM缓冲区在并发执行的安全性，所以需要对其进行加锁（如果项目的使用场景不存在并发情况，则可以忽略）。有操作系统时可以使用获取信号量来加锁，裸机时可以通过关闭全局中断来加锁。
 
 ```C
 void ef_port_env_lock(void)
@@ -107,7 +108,7 @@ void ef_port_env_lock(void)
 
 ### 4.6 对环境变量缓冲区解锁
 
-有操作系统是可以使用释放信号量来解锁，裸机时可以通过开启全局中断来解锁
+有操作系统是可以使用释放信号量来解锁，裸机时可以通过开启全局中断来解锁。
 
 ```C
 void ef_port_env_unlock(void)
@@ -115,7 +116,7 @@ void ef_port_env_unlock(void)
 
 ### 4.7 打印调试日志信息
 
-在定义`PRINT_DEBUG`宏后，打印调试日志信息
+在定义`PRINT_DEBUG`宏后，打印调试日志信息。
 
 ```C
 void ef_log_debug(const char *file, const long line, const char *format, ...)
@@ -166,7 +167,7 @@ void ef_print(const char *format, ...)
 磨损平衡：由于flash在写操作之前需要擦除且使用寿命有限，所以需要设计合理的磨损平衡（写平衡）机制，来保证数据被安全的保存在未到擦写寿命的Flash区中。
 
 - 默认状态：常规模式
-- 常规模式：关闭`FLASH_ENV_USING_WL_MODE`
+- 常规模式：关闭`EF_ENV_USING_WL_MODE`
 - 磨损平衡模式：打开`EF_ENV_USING_WL_MODE`
 
 #### 5.1.2 掉电保护
@@ -175,6 +176,21 @@ void ef_print(const char *format, ...)
 
 - 默认状态：关闭
 - 操作方法：开启、关闭`EF_ENV_USING_PFS_MODE`宏即可
+
+#### 5.1.3 自动更新（增量更新）
+
+可以对 ENV 设置版本号（参照 5.1.4）。当 ENV 初始化时，如果检测到产品存储的版本号与设定版本号不一致，会自动追加默认环境变量集合中新增的环境变量。
+
+该功能非常适用于经常升级的产品中，当产品功能变更时，有可能会新增环境变量，此时只需要增大当前设定的 ENV 版本号，下次固件升级后，新增的环境变量将会自动追加上去。
+
+- 默认状态：关闭
+- 操作方法：开启、关闭`EF_ENV_AUTO_UPDATE`宏即可
+
+#### 5.1.4 环境变量版本号
+
+该配置依赖于 5.1.3 配置。设置的环境变量版本号为整形数值，可以从 0 开始。如果在默认环境变量表中增加了环境变量，此时需要对该配置进行修改（通常加 1 ）。
+
+- 操作方法：修改`EF_ENV_VER_NUM`宏对应值即可
 
 ### 5.2 在线升级功能
 
@@ -204,12 +220,12 @@ void ef_print(const char *format, ...)
  - 1、常规模式：没有差异；
  - 2、擦写平衡模式：系统区将会占用1个`EF_ERASE_MIN_SIZE`大小，数据区至少等使用2个以上Flash扇区；
  - 3、掉电保护模式：环境变量区将会被备份，所以总容量是常规模式的2倍；
- - 4、擦写平衡+掉电保护模式：系统区将会占用1个`EF_ERASE_MIN_SIZE`大小，数据区将会是擦写平衡模式下的数据区总容量的2倍。
+ - 4、擦写平衡+掉电保护模式：所需容量将会是擦写平衡模式下总容量的2倍。
  - 例如：`EF_ERASE_MIN_SIZE`是128K，`ENV_USER_SETTING_SIZE`是2K，那么你可以这样定义不同模式下的环境变量总容量：
  - 1、常规模式：`1*EF_ERASE_MIN_SIZE`；
- - 2、擦写平衡模式：`3*EF_ERASE_MIN_SIZE`（它将会有2个Flash扇区去存储环境变量，按照每个Flash扇区可被擦写10W次计算，那么当前配置至少可擦写20W次）;
+ - 2、擦写平衡模式：`3*EF_ERASE_MIN_SIZE`（它将会有3个Flash扇区去存储环境变量，1个系统区，2个数据区，按照每个Flash扇区可被擦写10W次计算，那么当前配置至少可擦写20W次）;
  - 3、掉电保护模式：`2*EF_ERASE_MIN_SIZE`;
- - 4、擦写平衡+掉电保护模式：`5*EF_ERASE_MIN_SIZE`;
+ - 4、擦写平衡+掉电保护模式：`6*EF_ERASE_MIN_SIZE`;
 
 #### 5.5.1 备份区起始地址
 
@@ -252,10 +268,10 @@ void ef_print(const char *format, ...)
 
 ### 6.2 在线升级
 
-查看[`\demo\iap\README.md`](https://github.com/armink/EasyFlash/tree/master/demo/iap/README.md)说明文档。
+查看[`\demo\iap\README.md`](https://github.com/armink/EasyFlash/tree/master/demo/iap)说明文档。
 
 ### 6.3 日志
 
-查看[`\demo\log\README.md`](https://github.com/armink/EasyFlash/tree/master/demo/log/README.md)说明文档。
+查看[`\demo\log\README.md`](https://github.com/armink/EasyFlash/tree/master/demo/log)说明文档。
 
 > 注意：`easylogger.c`是使用[EasyLogger](https://github.com/armink/EasyLogger)与EasyFlash的无缝接口的例子，EasyLogger提供针对日志的很多常用功能封装，详细功能可以查看其介绍。使用这个例子时，务必记得将EasyLogger一并导入到项目中。
